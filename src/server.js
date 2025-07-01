@@ -98,7 +98,21 @@ addTool({
 
 addTool({
   name: "listFields",
-  description: "Paginated list of fields with optional filters.",
+  description: `
+Get all fields.
+
+Returns a paged list of fields. You can narrow the results by supplying the
+following query parameters:
+
+• type        – Only fields of this type (string)
+• farmId      – Only fields belonging to this farm ID (integer)
+• provider    – Only fields coming from this provider (string)
+• leafUserId  – Only fields that belong to this Leaf user (UUID string)
+
+Pagination:
+• page – Zero-based page number to fetch
+• size – Page size (default 20, max 100)
+`,
   parameters: z.object({
     type: z.string().optional(), farmId: z.number().int().optional(),
     provider: z.string().optional(), leafUserId: z.string().uuid().optional(),
@@ -131,10 +145,30 @@ addTool({
 
 addTool({
   name: "listOperations",
-  // `sort` accepts one or more comma-separated values. The first field has the
-  // highest priority; each value may be followed by ` asc` (default) or ` desc`.
-  // Example: "id desc,updatedTime"  → sort by id DESC then updatedTime ASC.
-  description: "Paginated list of operations with optional filters (see `sort`).",
+  description: `
+Get all operations.
+
+Returns a paged list of operations that belong to the authenticated
+organization. Filter parameters:
+
+• leafUserId    – UUID of one of your users
+• provider      – CNHI | JohnDeere | Trimble | ClimateFieldView | AgLeader | Stara | Leaf
+• startTime     – ISO-8601 timestamp; operations starting on/after this instant
+• updatedTime   – ISO-8601 timestamp; operations updated on/after this instant
+• endTime       – ISO-8601 timestamp; operations ending on/before this instant
+• operationType – applied | planted | harvested | tillage
+• fieldId       – Field UUID where the operation occurred
+
+Pagination:
+• page – Zero-based page number (default 0)
+• size – Page size (max 100)
+
+sort:
+One or more comma-separated fields, priority left-to-right.
+Each field may be suffixed by ' asc' (default) or ' desc'.
+Valid fields: id | leafUserId | startTime | endTime | type | updatedTime
+Example: "id desc,updatedTime"
+`,
   parameters: z.object({
     leafUserId: z.string().uuid().optional(), provider: z.string().optional(),
     startTime: z.string().optional(), updatedTime: z.string().optional(),
@@ -174,7 +208,20 @@ addTool({
 
 addTool({
   name: "listUsers",
-  description: "Paginated list of Leaf users, optionally filtered by email/name/externalId.",
+  description: `
+Get all Leaf Users.
+
+Returns a paged list of Leaf users that belong to the authenticated
+organization. You can filter the results with:
+
+• email      – Email address of the user
+• name       – Full name of the user
+• externalId – Your external identifier for the user
+
+Pagination:
+• page – Zero-based page number (default 0)
+• size – Page size (max 100)
+`,
   parameters: z.object({
     email: z.string().optional(), name: z.string().optional(),
     externalId: z.string().optional(), page: z.number().int().min(0).optional(),
@@ -191,9 +238,28 @@ addTool({
 
 addTool({
   name: "listFiles",
-  // Same `sort` behaviour as in listOperations (multi-value, asc/desc).
-  // Example: "createdTime desc,status"
-  description: "Paginated list of machine files with optional filters (see `sort`).",
+  description: `
+Paginated list of machine files with optional filters (see \`sort\`).
+
+Filter parameters:
+• leafUserId       – UUID of one of your users
+• provider         – CNHI | JohnDeere | Trimble | ClimateFieldView | AgLeader | RavenSlingshot | Stara | Leaf
+• status           – processed | failed | processing
+• origin           – provider | automerged | merged | uploaded
+• organizationId   – Provider organisation ID (John Deere only)
+• batchId          – UUID returned when an upload is initiated
+• createdTime      – ISO-8601 timestamp; files created on/after this instant
+• startTime        – ISO-8601 timestamp; operation started on/after this instant
+• updatedTime      – ISO-8601 timestamp; files updated on/after this instant
+• endTime          – ISO-8601 timestamp; operation ended on/before this instant
+• operationType    – applied | planted | harvested | tillage
+• minArea          – Minimum operation area in square metres (double)
+
+sort:
+One or more comma-separated fields, priority left-to-right.
+Each field may be suffixed by ' asc' (default) or ' desc'.
+Example: "createdTime desc,status"
+`,
   parameters: z.object({
     leafUserId: z.string().uuid().optional(), provider: z.string().optional(),
     status: z.string().optional(), origin: z.string().optional(),
