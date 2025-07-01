@@ -10,8 +10,11 @@ import { z }       from "zod";
 import { fetch }   from "undici";
 
 /* ---------- constants ---------- */
-const BASE_URL = new URL("https://api.withleaf.io/");
-const AUTH     = `Bearer ${process.env.LEAF_API_KEY || ""}`;
+const BASE_URL = new URL("https://api.withleaf.io/services/");   // keep trailing “/”
+
+const token = (process.env.LEAF_API_KEY || "").trim();
+if (!token) throw new Error("LEAF_API_KEY env var is missing");
+const AUTH  = `Bearer ${token}`;
 
 /* ---------- FastMCP shell ---------- */
 const server    = new FastMCP({ name: "Leaf API", version: "1.0.0" });
@@ -25,7 +28,6 @@ function addTool(tool) {
 
 /* =====  FIELD-BOUNDARY MANAGEMENT  ===== */
 
-/* 1. Create field */
 addTool({
   name: "createField",
   description: "Create a field for a Leaf user.",
@@ -34,9 +36,9 @@ addTool({
     body:       z.any()
   }),
   execute: async ({ leafUserId, body }) => {
-    const url = new URL(`/fields/api/users/${leafUserId}/fields`, BASE_URL);
+    const url = new URL(`fields/api/users/${leafUserId}/fields`, BASE_URL);
     const res = await fetch(url, {
-      method:  "POST",
+      method: "POST",
       headers: { Authorization: AUTH, "Content-Type": "application/json" },
       body:    JSON.stringify(body ?? {})
     });
@@ -45,7 +47,6 @@ addTool({
   }
 });
 
-/* 2. Get field */
 addTool({
   name: "getField",
   description: "Fetch a single field by ID.",
@@ -54,18 +55,16 @@ addTool({
     fieldId:    z.string()
   }),
   execute: async ({ leafUserId, fieldId }) => {
-    const url = new URL(`/fields/api/users/${leafUserId}/fields/${fieldId}`, BASE_URL);
+    const url = new URL(`fields/api/users/${leafUserId}/fields/${fieldId}`, BASE_URL);
     const res = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
     const txt = await res.text();
     try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
   }
 });
 
-/* 3. List fields */
 addTool({
   name: "listFields",
-  description:
-    "Return a paginated list of fields. Supports type, farmId, provider, leafUserId, page, size filters.",
+  description: "Paginated list of fields with optional filters.",
   parameters: z.object({
     type:       z.string().optional(),
     farmId:     z.number().int().optional(),
@@ -75,7 +74,7 @@ addTool({
     size:       z.number().int().min(1).max(100).optional()
   }),
   execute: async (args) => {
-    const url = new URL("/fields/api/fields", BASE_URL);
+    const url = new URL("fields/api/fields", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
     const res = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
     const txt = await res.text();
@@ -83,7 +82,6 @@ addTool({
   }
 });
 
-/* 4. Get field boundary */
 addTool({
   name: "getFieldBoundary",
   description: "Return the active boundary of a field.",
@@ -92,17 +90,13 @@ addTool({
     fieldId:    z.string()
   }),
   execute: async ({ leafUserId, fieldId }) => {
-    const url = new URL(
-      `/fields/api/users/${leafUserId}/fields/${fieldId}/boundary`,
-      BASE_URL
-    );
+    const url = new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL);
     const res = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
     const txt = await res.text();
     try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
   }
 });
 
-/* 5. Update field boundary */
 addTool({
   name: "updateFieldBoundary",
   description: "Replace the active boundary of a field.",
@@ -112,12 +106,9 @@ addTool({
     body:       z.any()
   }),
   execute: async ({ leafUserId, fieldId, body }) => {
-    const url = new URL(
-      `/fields/api/users/${leafUserId}/fields/${fieldId}/boundary`,
-      BASE_URL
-    );
+    const url = new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL);
     const res = await fetch(url, {
-      method:  "PUT",
+      method: "PUT",
       headers: { Authorization: AUTH, "Content-Type": "application/json" },
       body:    JSON.stringify(body ?? {})
     });
@@ -128,11 +119,9 @@ addTool({
 
 /* =====  OPERATIONS  ===== */
 
-/* 6. List operations */
 addTool({
   name: "listOperations",
-  description:
-    "Paginated list of operations with optional filters (leafUserId, provider, startTime, updatedTime, endTime, operationType, fieldId, page, size, sort).",
+  description: "Paginated list of operations with optional filters.",
   parameters: z.object({
     leafUserId:    z.string().uuid().optional(),
     provider:      z.string().optional(),
@@ -146,7 +135,7 @@ addTool({
     sort:          z.string().optional()
   }),
   execute: async (args) => {
-    const url = new URL("/operations/api/operations", BASE_URL);
+    const url = new URL("operations/api/operations", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
     const res = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
     const txt = await res.text();
@@ -154,39 +143,36 @@ addTool({
   }
 });
 
-/* 7. Get operation */
 addTool({
   name: "getOperation",
   description: "Get a single operation by ID.",
   parameters: z.object({ id: z.string() }),
   execute: async ({ id }) => {
-    const url = new URL(`/operations/api/operations/${id}`, BASE_URL);
+    const url = new URL(`operations/api/operations/${id}`, BASE_URL);
     const res = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
     const txt = await res.text();
     try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
   }
 });
 
-/* 8. Get operation summary */
 addTool({
   name: "getOperationSummary",
   description: "Get GeoJSON summary for an operation.",
   parameters: z.object({ id: z.string() }),
   execute: async ({ id }) => {
-    const url = new URL(`/operations/api/operations/${id}/summary`, BASE_URL);
+    const url = new URL(`operations/api/operations/${id}/summary`, BASE_URL);
     const res = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
     const txt = await res.text();
     try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
   }
 });
 
-/* 9. Get operation units */
 addTool({
   name: "getOperationUnits",
   description: "Return unit map for an operation.",
   parameters: z.object({ id: z.string() }),
   execute: async ({ id }) => {
-    const url = new URL(`/operations/api/operations/${id}/units`, BASE_URL);
+    const url = new URL(`operations/api/operations/${id}/units`, BASE_URL);
     const res = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
     const txt = await res.text();
     try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
@@ -195,10 +181,9 @@ addTool({
 
 /* =====  LEAF USERS  ===== */
 
-/* 10. List users */
 addTool({
   name: "listUsers",
-  description: "Paginated list of Leaf users, filterable by email, name, externalId.",
+  description: "Paginated list of Leaf users, optionally filtered by email/name/externalId.",
   parameters: z.object({
     email:      z.string().optional(),
     name:       z.string().optional(),
@@ -207,7 +192,7 @@ addTool({
     size:       z.number().int().min(1).max(100).optional()
   }),
   execute: async (args) => {
-    const url = new URL("/usermanagement/api/users", BASE_URL);
+    const url = new URL("usermanagement/api/users", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
     const res = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
     const txt = await res.text();
@@ -217,11 +202,9 @@ addTool({
 
 /* =====  MACHINE FILES  ===== */
 
-/* 11. List files */
 addTool({
   name: "listFiles",
-  description:
-    "Paginated list of machine files. Supports many optional filters (leafUserId, provider, status, origin, organizationId, batchId, createdTime, startTime, updatedTime, endTime, operationType, minArea, page, size, sort).",
+  description: "Paginated list of machine files with optional filters.",
   parameters: z.object({
     leafUserId:     z.string().uuid().optional(),
     provider:       z.string().optional(),
@@ -240,7 +223,7 @@ addTool({
     sort:           z.string().optional()
   }),
   execute: async (args) => {
-    const url = new URL("/operations/api/files", BASE_URL);
+    const url = new URL("operations/api/files", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
     const res = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
     const txt = await res.text();
@@ -248,26 +231,24 @@ addTool({
   }
 });
 
-/* 12. Get file */
 addTool({
   name: "getFile",
   description: "Return a machine file by ID.",
   parameters: z.object({ id: z.string() }),
   execute: async ({ id }) => {
-    const url = new URL(`/operations/api/files/${id}`, BASE_URL);
+    const url = new URL(`operations/api/files/${id}`, BASE_URL);
     const res = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
     const txt = await res.text();
     try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
   }
 });
 
-/* 13. Get file summary */
 addTool({
   name: "getFileSummary",
   description: "Return summary for a machine file by ID.",
   parameters: z.object({ id: z.string() }),
   execute: async ({ id }) => {
-    const url = new URL(`/operations/api/files/${id}/summary`, BASE_URL);
+    const url = new URL(`operations/api/files/${id}/summary`, BASE_URL);
     const res = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
     const txt = await res.text();
     try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
