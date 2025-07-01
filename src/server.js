@@ -297,7 +297,7 @@ addTool({
 
 addTool({
   name: "getWeatherForecastFieldDaily",
-  description: "Get daily forecasted weather for a Leaf user's field.",
+  description: "Get daily forecasted weather for a Leaf user's field. startTime & endTime format: YYYY-MM-DD",
   parameters: z.object({
     leafUserId: z.string(),
     fieldId:    z.string(),
