@@ -1,0 +1,29 @@
+{
+  "name": "leaf-mcp",
+  "version": "0.1.0",
+  "description": "Leaf API MCP proxy (Node + fastmcp)",
+  "keywords": ["leaf", "mcp", "openapi", "proxy", "agriculture", "farm", "farmers"],
+  "repository": { "type": "git", "url": "https://github.com/yourorg/leaf-mcp.git" },
+  "author": "Bailey Stockdale <bailey+npm@withleaf.io>",
+  "license": "MIT",
+
+  "type": "module",
+  "main": "src/server.js",
+  "bin": { "leaf-mcp": "src/server.js" },   
+
+  "engines": { "node": ">=18" },
+  "files": ["src"],                       
+
+  "dependencies": {
+    "fastmcp": "^3.8.2",
+    "yaml": "^2.4.0",
+    "zod": "^3.25.7",
+    "undici": "^7.15.0"
+  },
+
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "echo \"(no tests yet)\" && exit 0",
+    "prepublishOnly": "npm test"
+  }
+}
