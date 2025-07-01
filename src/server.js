@@ -131,7 +131,10 @@ addTool({
 
 addTool({
   name: "listOperations",
-  description: "Paginated list of operations with optional filters.",
+  // `sort` accepts one or more comma-separated values. The first field has the
+  // highest priority; each value may be followed by ` asc` (default) or ` desc`.
+  // Example: "id desc,updatedTime"  → sort by id DESC then updatedTime ASC.
+  description: "Paginated list of operations with optional filters (see `sort`).",
   parameters: z.object({
     leafUserId: z.string().uuid().optional(), provider: z.string().optional(),
     startTime: z.string().optional(), updatedTime: z.string().optional(),
@@ -188,7 +191,9 @@ addTool({
 
 addTool({
   name: "listFiles",
-  description: "Paginated list of machine files with optional filters.",
+  // Same `sort` behaviour as in listOperations (multi-value, asc/desc).
+  // Example: "createdTime desc,status"
+  description: "Paginated list of machine files with optional filters (see `sort`).",
   parameters: z.object({
     leafUserId: z.string().uuid().optional(), provider: z.string().optional(),
     status: z.string().optional(), origin: z.string().optional(),
@@ -218,6 +223,184 @@ addTool({
   description: "Return summary for a machine file by ID.",
   parameters: z.object({ id: z.string() }),
   execute: ({ id }) => _get(new URL(`operations/api/files/${id}/summary`, BASE_URL))
+});
+
+/* =====  WEATHER  ===== */
+
+/* ---- forecast – field ---- */
+
+addTool({
+  name: "getWeatherForecastFieldDaily",
+  description: "Get daily forecasted weather for a Leaf user's field.",
+  parameters: z.object({
+    leafUserId: z.string(),
+    fieldId:    z.string(),
+    startTime:  z.string().optional(),
+    endTime:    z.string().optional(),
+    model:      z.string().optional(),
+    units:      z.string().optional()
+  }),
+  execute: ({ leafUserId, fieldId, ...query }) => {
+    const url = new URL(
+      `weather/api/users/${leafUserId}/weather/forecast/field/${fieldId}/daily`,
+      BASE_URL
+    );
+    for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
+    return _get(url);
+  }
+});
+
+addTool({
+  name: "getWeatherForecastFieldHourly",
+  description: "Get hourly forecasted weather for a Leaf user's field.",
+  parameters: z.object({
+    leafUserId: z.string(),
+    fieldId:    z.string(),
+    startTime:  z.string().optional(),
+    endTime:    z.string().optional(),
+    model:      z.string().optional(),
+    units:      z.string().optional()
+  }),
+  execute: ({ leafUserId, fieldId, ...query }) => {
+    const url = new URL(
+      `weather/api/users/${leafUserId}/weather/forecast/field/${fieldId}/hourly`,
+      BASE_URL
+    );
+    for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
+    return _get(url);
+  }
+});
+
+/* ---- forecast – lat/lon ---- */
+
+addTool({
+  name: "getWeatherForecastLatLonDaily",
+  description: "Get daily forecasted weather for a latitude/longitude pair.",
+  parameters: z.object({
+    lat:       z.number(),
+    lon:       z.number(),
+    startTime: z.string().optional(),
+    endTime:   z.string().optional(),
+    model:     z.string().optional(),
+    units:     z.string().optional()
+  }),
+  execute: ({ lat, lon, ...query }) => {
+    const url = new URL(
+      `weather/api/weather/forecast/daily/${lat},${lon}`,
+      BASE_URL
+    );
+    for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
+    return _get(url);
+  }
+});
+
+addTool({
+  name: "getWeatherForecastLatLonHourly",
+  description: "Get hourly forecasted weather for a latitude/longitude pair.",
+  parameters: z.object({
+    lat:       z.number(),
+    lon:       z.number(),
+    startTime: z.string().optional(),
+    endTime:   z.string().optional(),
+    model:     z.string().optional(),
+    units:     z.string().optional()
+  }),
+  execute: ({ lat, lon, ...query }) => {
+    const url = new URL(
+      `weather/api/weather/forecast/hourly/${lat},${lon}`,
+      BASE_URL
+    );
+    for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
+    return _get(url);
+  }
+});
+
+/* ---- historical – field ---- */
+
+addTool({
+  name: "getWeatherHistoricalFieldDaily",
+  description: "Get daily historical weather for a Leaf user's field.",
+  parameters: z.object({
+    leafUserId: z.string(),
+    fieldId:    z.string(),
+    startTime:  z.string().optional(),
+    endTime:    z.string().optional(),
+    model:      z.string().optional(),
+    units:      z.string().optional()
+  }),
+  execute: ({ leafUserId, fieldId, ...query }) => {
+    const url = new URL(
+      `weather/api/users/${leafUserId}/weather/historical/field/${fieldId}/daily`,
+      BASE_URL
+    );
+    for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
+    return _get(url);
+  }
+});
+
+addTool({
+  name: "getWeatherHistoricalFieldHourly",
+  description: "Get hourly historical weather for a Leaf user's field.",
+  parameters: z.object({
+    leafUserId: z.string(),
+    fieldId:    z.string(),
+    startTime:  z.string().optional(),
+    endTime:    z.string().optional(),
+    model:      z.string().optional(),
+    units:      z.string().optional()
+  }),
+  execute: ({ leafUserId, fieldId, ...query }) => {
+    const url = new URL(
+      `weather/api/users/${leafUserId}/weather/historical/field/${fieldId}/hourly`,
+      BASE_URL
+    );
+    for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
+    return _get(url);
+  }
+});
+
+/* ---- historical – lat/lon ---- */
+
+addTool({
+  name: "getWeatherHistoricalLatLonDaily",
+  description: "Get daily historical weather for a latitude/longitude pair.",
+  parameters: z.object({
+    lat:       z.number(),
+    lon:       z.number(),
+    startTime: z.string().optional(),
+    endTime:   z.string().optional(),
+    model:     z.string().optional(),
+    units:     z.string().optional()
+  }),
+  execute: ({ lat, lon, ...query }) => {
+    const url = new URL(
+      `weather/api/weather/historical/daily/${lat},${lon}`,
+      BASE_URL
+    );
+    for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
+    return _get(url);
+  }
+});
+
+addTool({
+  name: "getWeatherHistoricalLatLonHourly",
+  description: "Get hourly historical weather for a latitude/longitude pair.",
+  parameters: z.object({
+    lat:       z.number(),
+    lon:       z.number(),
+    startTime: z.string().optional(),
+    endTime:   z.string().optional(),
+    model:     z.string().optional(),
+    units:     z.string().optional()
+  }),
+  execute: ({ lat, lon, ...query }) => {
+    const url = new URL(
+      `weather/api/weather/historical/hourly/${lat},${lon}`,
+      BASE_URL
+    );
+    for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
+    return _get(url);
+  }
 });
 
 /* ---------- list mode ---------- */
