@@ -10,7 +10,7 @@ import { z }       from "zod";
 import { fetch }   from "undici";
 
 /* ---------- constants ---------- */
-const BASE_URL = new URL("https://api.withleaf.io/services");
+const BASE_URL = new URL("https://api.withleaf.io/");
 const AUTH     = `Bearer ${process.env.LEAF_API_KEY || ""}`;
 
 /* ---------- FastMCP shell ---------- */
