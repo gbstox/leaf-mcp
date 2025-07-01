@@ -165,7 +165,7 @@ Pagination:
 
 sort:
 One or more comma-separated fields, priority left-to-right.
-Each field may be suffixed by ' asc' (default) or ' desc'.
+Each field may be suffixed by ',asc' (default) or ',desc'.
 Valid fields: id | leafUserId | startTime | endTime | type | updatedTime
 Example: "id desc,updatedTime"
 `,
@@ -257,7 +257,7 @@ Filter parameters:
 
 sort:
 One or more comma-separated fields, priority left-to-right.
-Each field may be suffixed by ' asc' (default) or ' desc'.
+Each field may be suffixed by ',asc' (default) or ',desc'.
 Example: "createdTime desc,status"
 `,
   parameters: z.object({
