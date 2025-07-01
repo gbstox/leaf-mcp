@@ -1,101 +1,96 @@
 #!/usr/bin/env node
 /**
  * Leaf MCP proxy — Node 18+ / fastmcp@3.8
- *  – normal mode:   node leaf-mcp        (waits for JSON-RPC over stdio)
- *  – list  mode:    leaf-mcp --tools=list   (prints catalogue then exits)
+ *
+ *   normal :  node leaf-mcp
+ *   list    :  leaf-mcp --tools=list
  */
-import fs from "fs";
-import yaml from "yaml";
 import { FastMCP } from "fastmcp";
-import { z } from "zod";
-import { fetch } from "undici";
+import { z }       from "zod";
+import { fetch }   from "undici";
 
-/* ---------- load trimmed OpenAPI spec ---------- */
-const spec = yaml.parse(
-  fs.readFileSync(
-    new URL("./resources/leaf_mcp_spec.yaml", import.meta.url),
-    "utf8"
-  )
-);
+/* ---------- constants ---------- */
+const BASE_URL = new URL("https://api.withleaf.io/services");
+const AUTH     = `Bearer ${process.env.LEAF_API_KEY || ""}`;
 
-const BASE_URL = new URL(
-  spec.servers?.[0]?.url || "https://api.withleaf.io/services"
-);
+/* ---------- FastMCP shell ---------- */
+const server    = new FastMCP({ name: "Leaf API", version: "1.0.0" });
+const catalogue = [];   // reused for --tools=list
 
-/* ---------- create server shell ---------- */
-const server = new FastMCP({
-  name: "Leaf API",
-  version: spec.info?.version || "1.0.0"
+/* ---------- helper ---------- */
+function addTool(tool) {
+  server.addTool(tool);
+  catalogue.push({ name: tool.name, description: tool.description });
+}
+
+/* ---------- 1. Create field ---------- */
+addTool({
+  name: "createField",
+  description: "Create a field for a Leaf user.",
+  parameters: z.object({
+    leafUserId: z.string().describe("Leaf user ID"),
+    body:       z.any().describe("JSON matching FieldCreate schema")
+  }),
+  execute: async ({ leafUserId, body }) => {
+    const url  = new URL(`/fields/api/users/${leafUserId}/fields`, BASE_URL);
+    const res  = await fetch(url, {
+      method:  "POST",
+      headers: { Authorization: AUTH, "Content-Type": "application/json" },
+      body:    JSON.stringify(body ?? {})
+    });
+    const txt = await res.text();
+    try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
+  }
 });
 
-const catalogue = [];                 // we keep a copy for --tools=list
-
-/* ---------- helper: Zod schema ---------- */
-function schema(op) {
-  const shape = {};
-  for (const p of op.parameters || []) shape[p.name] = z.any();
-  if (op.requestBody?.content?.["application/json"]) shape.__body = z.any();
-  return Object.keys(shape).length ? z.object(shape) : z.object({});
-}
-
-/* ---------- register every operation ---------- */
-for (const [path, methods] of Object.entries(spec.paths)) {
-  for (const [httpMethod, op] of Object.entries(methods)) {
-    const toolName = (op.operationId || `${httpMethod}_${path}`)
-      .replace(/[{}\/]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_|_$/g, "");
-
-    const tool = {
-      name: toolName,
-      description:
-        op.summary || op.description || `${httpMethod.toUpperCase()} ${path}`,
-      parameters: schema(op),
-
-      execute: async (args) => {
-        /* build URL */
-        const urlPath = path.replace(/\{(\w+)\}/g, (_, k) => args[k]);
-        const url = new URL(urlPath, BASE_URL);
-
-        /* query params */
-        (op.parameters || []).forEach((p) => {
-          if (
-            p.in === "query" &&
-            !path.includes(`{${p.name}}`) &&
-            args[p.name] !== undefined
-          ) {
-            url.searchParams.set(p.name, args[p.name]);
-          }
-        });
-
-        /* HTTP call */
-        const res = await fetch(url, {
-          method: httpMethod.toUpperCase(),
-          headers: {
-            Authorization: `Bearer ${process.env.LEAF_API_KEY || ""}`,
-            "Content-Type": "application/json"
-          },
-          body: op.requestBody?.content?.["application/json"]
-            ? JSON.stringify(args.__body || {})
-            : undefined
-        });
-
-        const text = await res.text();
-        try { return JSON.stringify(JSON.parse(text)); }
-        catch { return text; }
-      }
-    };
-
-    server.addTool(tool);
-    catalogue.push({ name: tool.name, description: tool.description });
+/* ---------- 2. Get field ---------- */
+addTool({
+  name: "getField",
+  description: "Fetch a single field by ID.",
+  parameters: z.object({
+    leafUserId: z.string().describe("Leaf user ID"),
+    fieldId:    z.string().describe("Field ID")
+  }),
+  execute: async ({ leafUserId, fieldId }) => {
+    const url  = new URL(
+      `/fields/api/users/${leafUserId}/fields/${fieldId}`,
+      BASE_URL
+    );
+    const res  = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
+    const txt = await res.text();
+    try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
   }
-}
+});
 
-/* ---------- one-shot list mode ---------- */
+/* ---------- 3. List fields ---------- */
+addTool({
+  name: "listFields",
+  description:
+    "Return a paginated list of fields. Supports type, farmId, provider, leafUserId, page, size filters.",
+  parameters: z.object({
+    type:       z.string().optional(),
+    farmId:     z.number().int().optional(),
+    provider:   z.string().optional(),
+    leafUserId: z.string().uuid().optional(),
+    page:       z.number().int().min(0).optional(),
+    size:       z.number().int().min(1).max(100).optional()
+  }),
+  execute: async (args) => {
+    const url = new URL("/fields/api/fields", BASE_URL);
+    for (const [k, v] of Object.entries(args)) {
+      if (v !== undefined) url.searchParams.set(k, String(v));
+    }
+    const res  = await fetch(url, { method: "GET", headers: { Authorization: AUTH } });
+    const txt  = await res.text();
+    try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
+  }
+});
+
+/* ---------- list mode ---------- */
 if (process.argv.includes("--tools=list")) {
   console.log(JSON.stringify(catalogue, null, 2));
   process.exit(0);
 }
 
-/* ---------- normal MCP stdio loop ---------- */
+/* ---------- stdio loop ---------- */
 server.start({ transportType: "stdio" });
