@@ -1,6 +1,6 @@
 {
   "name": "leaf-mcp",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "description": "Leaf API MCP proxy (Node + fastmcp)",
   "keywords": [
     "leaf",
