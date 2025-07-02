@@ -1,6 +1,6 @@
 {
   "name": "leaf-mcp",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "description": "Leaf API MCP proxy (Node + fastmcp)",
   "keywords": [
     "leaf",
@@ -38,6 +38,6 @@
     "start": "node src/server.js",
     "test": "echo \"(no tests yet)\" && exit 0",
     "prepublishOnly": "npm test",
-    "http":  "MCP_HTTP=1 node src/server.js"
+    "http": "MCP_HTTP=1 node src/server.js"
   }
 }
