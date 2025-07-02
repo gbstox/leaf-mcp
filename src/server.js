@@ -82,7 +82,7 @@ addTool({
   description: "Create a field for a Leaf user.",
   parameters: z.object({ leafUserId: z.string(), body: z.any() }),
   execute: ({ leafUserId, body }, { session }) =>
-    _bodyReq(new URL(`fields/api/users/${leafUserId}/fields`, BASE_URL), "POST", body, session.leafToken)
+    _bodyReq(new URL(`fields/api/users/${leafUserId}/fields`, BASE_URL), "POST", body, session?.leafToken ?? token)
 });
 
 addTool({
@@ -90,7 +90,7 @@ addTool({
   description: "Fetch a single field by ID.",
   parameters: z.object({ leafUserId: z.string(), fieldId: z.string() }),
   execute: ({ leafUserId, fieldId }, { session }) =>
-    _get(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}`, BASE_URL), session.leafToken)
+    _get(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}`, BASE_URL), session?.leafToken ?? token)
 });
 
 addTool({
@@ -118,7 +118,7 @@ Pagination:
   execute: (args, { session }) => {
     const url = new URL("fields/api/fields", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session.leafToken);
+    return _get(url, session?.leafToken ?? token);
   }
 });
 
@@ -127,7 +127,7 @@ addTool({
   description: "Return the active boundary of a field.",
   parameters: z.object({ leafUserId: z.string(), fieldId: z.string() }),
   execute: ({ leafUserId, fieldId }, { session }) =>
-    _get(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL), session.leafToken)
+    _get(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL), session?.leafToken ?? token)
 });
 
 addTool({
@@ -135,7 +135,7 @@ addTool({
   description: "Replace the active boundary of a field.",
   parameters: z.object({ leafUserId: z.string(), fieldId: z.string(), body: z.any() }),
   execute: ({ leafUserId, fieldId, body }, { session }) =>
-    _bodyReq(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL),"PUT",body,session.leafToken)
+    _bodyReq(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL),"PUT",body,session?.leafToken ?? token)
 });
 
 /* =====  OPERATIONS  ===== */
@@ -176,7 +176,7 @@ Example: "startTime,desc"
   execute: (args, { session }) => {
     const url = new URL("operations/api/operations", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session.leafToken);
+    return _get(url, session?.leafToken ?? token);
   }
 });
 
@@ -184,21 +184,21 @@ addTool({
   name: "getOperation",
   description: "Get a single operation by ID.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}`, BASE_URL), session.leafToken)
+  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}`, BASE_URL), session?.leafToken ?? token)
 });
 
 addTool({
   name: "getOperationSummary",
   description: "Get GeoJSON summary for an operation.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}/summary`, BASE_URL), session.leafToken)
+  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}/summary`, BASE_URL), session?.leafToken ?? token)
 });
 
 addTool({
   name: "getOperationUnits",
   description: "Return unit map for an operation.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}/units`, BASE_URL), session.leafToken)
+  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}/units`, BASE_URL), session?.leafToken ?? token)
 });
 
 /* =====  LEAF USERS  ===== */
@@ -227,7 +227,7 @@ Pagination:
   execute: (args, { session }) => {
     const url = new URL("usermanagement/api/users", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session.leafToken);
+    return _get(url, session?.leafToken ?? token);
   }
 });
 
@@ -267,10 +267,10 @@ Example: "createdTime,desc"
     page: z.number().int().min(0).optional(), size: z.number().int().min(1).max(100).optional(),
     sort: z.string().optional()
   }),
-  execute: (args, { session }) => {
+  execute: (args, { session } = {}) => {
     const url = new URL("operations/api/files", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session.leafToken);
+    return _get(url, session?.leafToken ?? token);
   }
 });
 
@@ -278,14 +278,14 @@ addTool({
   name: "getFile",
   description: "Return a machine file by ID.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/files/${id}`, BASE_URL), session.leafToken)
+  execute: ({ id }, { session }) => _get(new URL(`operations/api/files/${id}`, BASE_URL), session?.leafToken ?? token)
 });
 
 addTool({
   name: "getFileSummary",
   description: "Return summary for a machine file by ID.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/files/${id}/summary`, BASE_URL), session.leafToken)
+  execute: ({ id }, { session }) => _get(new URL(`operations/api/files/${id}/summary`, BASE_URL), session?.leafToken ?? token)
 });
 
 addTool({
@@ -321,7 +321,7 @@ addTool({
    */
   parameters: z.object({ id: z.string() }),
   execute: ({ id }, { session }) =>
-    _get(new URL(`operations/api/files/${id}/status`, BASE_URL), session.leafToken)
+    _get(new URL(`operations/api/files/${id}/status`, BASE_URL), session?.leafToken ?? token)
 });
 
 /* =====  WEATHER  ===== */
@@ -345,7 +345,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session.leafToken);
+    return _get(url, session?.leafToken ?? token);
   }
 });
 
@@ -366,7 +366,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session.leafToken);
+    return _get(url, session?.leafToken ?? token);
   }
 });
 
@@ -389,7 +389,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session.leafToken);
+    return _get(url, session?.leafToken ?? token);
   }
 });
 
@@ -410,7 +410,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session.leafToken);
+    return _get(url, session?.leafToken ?? token);
   }
 });
 
@@ -433,7 +433,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session.leafToken);
+    return _get(url, session?.leafToken ?? token);
   }
 });
 
@@ -454,7 +454,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session.leafToken);
+    return _get(url, session?.leafToken ?? token);
   }
 });
 
@@ -477,7 +477,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session.leafToken);
+    return _get(url, session?.leafToken ?? token);
   }
 });
 
@@ -498,7 +498,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session.leafToken);
+    return _get(url, session?.leafToken ?? token);
   }
 });
 
