@@ -291,6 +291,42 @@ addTool({
   execute: ({ id }) => _get(new URL(`operations/api/files/${id}/summary`, BASE_URL))
 });
 
+addTool({
+  name: "getFileStatus",
+  /*
+   * Get a file status
+   *
+   * Returns the processing status for every step of Leaf’s pipeline for the
+   * specified file.
+   *
+   * Endpoint:
+   *   GET /operations/api/files/{id}/status
+   *
+   * Path parameter:
+   *   • id – UUID of the file to inspect
+   *
+   * Example curl:
+   *   curl -H "Authorization: Bearer $TOKEN" \\
+   *        "https://api.withleaf.io/services/operations/api/files/{id}/status"
+   *
+   * Example response:
+   *   {
+   *     "rawGeojson":       { "status": "processed", "message": "ok" },
+   *     "normalizedGeojson":{ "status": "processed", "message": "ok" },
+   *     "standardGeojson":  { "status": "processed", "message": "ok" },
+   *     "propertiesPNGs":   { "status": "processed", "message": "ok" },
+   *     "areaAndYield":     { "status": "processed", "message": "ok" },
+   *     "summary":          { "status": "processed", "message": "ok" },
+   *     "units":            { "status": "processed", "message": "ok" },
+   *     "originalFile":     { "status": "processed", "message": "ok" },
+   *     "cleanupGeojson":   { "status": "processed", "message": "ok" }
+   *   }
+   */
+  parameters: z.object({ id: z.string() }),
+  execute: ({ id }) =>
+    _get(new URL(`operations/api/files/${id}/status`, BASE_URL))
+});
+
 /* =====  WEATHER  ===== */
 
 /* ---- forecast – field ---- */
