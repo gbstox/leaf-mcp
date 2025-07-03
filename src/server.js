@@ -16,9 +16,9 @@ const USE_HTTP = process.env.MCP_HTTP === "1";
 const PORT     = process.env.PORT     || 8080;
 
 /* ─────────── bearer-token handling ─── */
-let currentToken = (process.env.LEAF_API_KEY || "").trim();
+const ENV_TOKEN = (process.env.LEAF_API_KEY || "").trim();
 
-if (!USE_HTTP && !currentToken) {
+if (!USE_HTTP && !ENV_TOKEN) {
   throw new Error("LEAF_API_KEY env var is missing (required for STDIO mode)");
 }
 
@@ -34,21 +34,21 @@ if (USE_HTTP) {
     if (!hdr.startsWith("Bearer ")) {
       throw new Response("Missing Bearer token", { status: 401 });
     }
-    currentToken = hdr;              // update for this request
-    return {};                       // no session data needed
+    // Expose as session.leafToken for this request
+    return { leafToken: hdr };
   };
 }
 
 /* ─────────── helper fetch wrappers ─ */
-const _get = async (url) => {
-  const res = await fetch(url, { headers: { Authorization: currentToken } });
+const _get = async (url, token) => {
+  const res = await fetch(url, { headers: { Authorization: token } });
   const txt = await res.text();
   try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
 };
-const _bodyReq = async (url, method, bodyObj) => {
+const _bodyReq = async (url, method, bodyObj, token) => {
   const res = await fetch(url, {
     method,
-    headers: { Authorization: currentToken, "Content-Type": "application/json" },
+    headers: { Authorization: token, "Content-Type": "application/json" },
     body: JSON.stringify(bodyObj ?? {}),
   });
   const txt = await res.text();
@@ -105,16 +105,24 @@ addTool({
   name: "createField",
   description: "Create a field for a Leaf user.",
   parameters: z.object({ leafUserId: z.string(), body: z.any() }),
-  execute: ({ leafUserId, body }, { session }) =>
-    _bodyReq(new URL(`fields/api/users/${leafUserId}/fields`, BASE_URL), "POST", body)
+  execute: ({ leafUserId, body }, { session } = {}) =>
+    _bodyReq(
+      new URL(`fields/api/users/${leafUserId}/fields`, BASE_URL),
+      "POST",
+      body,
+      session?.leafToken || `Bearer ${ENV_TOKEN}`
+    )
 });
 
 addTool({
   name: "getField",
   description: "Fetch a single field by ID.",
   parameters: z.object({ leafUserId: z.string(), fieldId: z.string() }),
-  execute: ({ leafUserId, fieldId }, { session }) =>
-    _get(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}`, BASE_URL))
+  execute: ({ leafUserId, fieldId }, { session } = {}) =>
+    _get(
+      new URL(`fields/api/users/${leafUserId}/fields/${fieldId}`, BASE_URL),
+      session?.leafToken || `Bearer ${ENV_TOKEN}`
+    )
 });
 
 addTool({
@@ -139,10 +147,10 @@ Pagination:
     provider: z.string().optional(), leafUserId: z.string().uuid().optional(),
     page: z.number().int().min(0).optional(), size: z.number().int().min(1).max(100).optional()
   }),
-  execute: (args, { session }) => {
+  execute: (args, { session } = {}) => {
     const url = new URL("fields/api/fields", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url);
+    return _get(url, session?.leafToken || `Bearer ${ENV_TOKEN}`);
   }
 });
 
@@ -150,16 +158,24 @@ addTool({
   name: "getFieldBoundary",
   description: "Return the active boundary of a field.",
   parameters: z.object({ leafUserId: z.string(), fieldId: z.string() }),
-  execute: ({ leafUserId, fieldId }, { session }) =>
-    _get(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL))
+  execute: ({ leafUserId, fieldId }, { session } = {}) =>
+    _get(
+      new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL),
+      session?.leafToken || `Bearer ${ENV_TOKEN}`
+    )
 });
 
 addTool({
   name: "updateFieldBoundary",
   description: "Replace the active boundary of a field.",
   parameters: z.object({ leafUserId: z.string(), fieldId: z.string(), body: z.any() }),
-  execute: ({ leafUserId, fieldId, body }, { session }) =>
-    _bodyReq(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL),"PUT",body)
+  execute: ({ leafUserId, fieldId, body }, { session } = {}) =>
+    _bodyReq(
+      new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL),
+      "PUT",
+      body,
+      session?.leafToken || `Bearer ${ENV_TOKEN}`
+    )
 });
 
 /* =====  OPERATIONS  ===== */
@@ -197,10 +213,10 @@ Example: "startTime,desc"
     fieldId: z.string().uuid().optional(), page: z.number().int().min(0).optional(),
     size: z.number().int().min(1).max(100).optional(), sort: z.string().optional()
   }),
-  execute: (args, { session }) => {
+  execute: (args, { session } = {}) => {
     const url = new URL("operations/api/operations", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url);
+    return _get(url, session?.leafToken || `Bearer ${ENV_TOKEN}`);
   }
 });
 
@@ -208,21 +224,24 @@ addTool({
   name: "getOperation",
   description: "Get a single operation by ID.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}`, BASE_URL))
+  execute: ({ id }, { session } = {}) =>
+    _get(new URL(`operations/api/operations/${id}`, BASE_URL), session?.leafToken || `Bearer ${ENV_TOKEN}`)
 });
 
 addTool({
   name: "getOperationSummary",
   description: "Get GeoJSON summary for an operation.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}/summary`, BASE_URL))
+  execute: ({ id }, { session } = {}) =>
+    _get(new URL(`operations/api/operations/${id}/summary`, BASE_URL), session?.leafToken || `Bearer ${ENV_TOKEN}`)
 });
 
 addTool({
   name: "getOperationUnits",
   description: "Return unit map for an operation.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}/units`, BASE_URL))
+  execute: ({ id }, { session } = {}) =>
+    _get(new URL(`operations/api/operations/${id}/units`, BASE_URL), session?.leafToken || `Bearer ${ENV_TOKEN}`)
 });
 
 /* =====  LEAF USERS  ===== */
@@ -248,10 +267,10 @@ Pagination:
     externalId: z.string().optional(), page: z.number().int().min(0).optional(),
     size: z.number().int().min(1).max(100).optional()
   }),
-  execute: (args, { session }) => {
+  execute: (args, { session } = {}) => {
     const url = new URL("usermanagement/api/users", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url);
+    return _get(url, session?.leafToken || `Bearer ${ENV_TOKEN}`);
   }
 });
 
@@ -294,7 +313,7 @@ Example: "createdTime,desc"
   execute: (args, { session } = {}) => {
     const url = new URL("operations/api/files", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url);
+    return _get(url, session?.leafToken || `Bearer ${ENV_TOKEN}`);
   }
 });
 
@@ -302,14 +321,16 @@ addTool({
   name: "getFile",
   description: "Return a machine file by ID.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/files/${id}`, BASE_URL))
+  execute: ({ id }, { session } = {}) =>
+    _get(new URL(`operations/api/files/${id}`, BASE_URL), session?.leafToken || `Bearer ${ENV_TOKEN}`)
 });
 
 addTool({
   name: "getFileSummary",
   description: "Return summary for a machine file by ID.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/files/${id}/summary`, BASE_URL))
+  execute: ({ id }, { session } = {}) =>
+    _get(new URL(`operations/api/files/${id}/summary`, BASE_URL), session?.leafToken || `Bearer ${ENV_TOKEN}`)
 });
 
 addTool({
@@ -344,8 +365,8 @@ addTool({
    *   }
    */
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) =>
-    _get(new URL(`operations/api/files/${id}/status`, BASE_URL))
+  execute: ({ id }, { session } = {}) =>
+    _get(new URL(`operations/api/files/${id}/status`, BASE_URL), session?.leafToken || `Bearer ${ENV_TOKEN}`)
 });
 
 /* =====  WEATHER  ===== */
@@ -363,13 +384,13 @@ addTool({
     model:      z.string().optional(),
     units:      z.string().optional()
   }),
-  execute: ({ leafUserId, fieldId, ...query }, { session }) => {
+  execute: ({ leafUserId, fieldId, ...query }, { session } = {}) => {
     const url = new URL(
       `weather/api/users/${leafUserId}/weather/forecast/field/${fieldId}/daily`,
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url);
+    return _get(url, session?.leafToken || `Bearer ${ENV_TOKEN}`);
   }
 });
 
@@ -384,13 +405,13 @@ addTool({
     model:      z.string().optional(),
     units:      z.string().optional()
   }),
-  execute: ({ leafUserId, fieldId, ...query }, { session }) => {
+  execute: ({ leafUserId, fieldId, ...query }, { session } = {}) => {
     const url = new URL(
       `weather/api/users/${leafUserId}/weather/forecast/field/${fieldId}/hourly`,
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url);
+    return _get(url, session?.leafToken || `Bearer ${ENV_TOKEN}`);
   }
 });
 
@@ -407,13 +428,13 @@ addTool({
     model:     z.string().optional(),
     units:     z.string().optional()
   }),
-  execute: ({ lat, lon, ...query }, { session }) => {
+  execute: ({ lat, lon, ...query }, { session } = {}) => {
     const url = new URL(
       `weather/api/weather/forecast/daily/${lat},${lon}`,
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url);
+    return _get(url, session?.leafToken || `Bearer ${ENV_TOKEN}`);
   }
 });
 
@@ -428,13 +449,13 @@ addTool({
     model:     z.string().optional(),
     units:     z.string().optional()
   }),
-  execute: ({ lat, lon, ...query }, { session }) => {
+  execute: ({ lat, lon, ...query }, { session } = {}) => {
     const url = new URL(
       `weather/api/weather/forecast/hourly/${lat},${lon}`,
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url);
+    return _get(url, session?.leafToken || `Bearer ${ENV_TOKEN}`);
   }
 });
 
@@ -451,13 +472,13 @@ addTool({
     model:      z.string().optional(),
     units:      z.string().optional()
   }),
-  execute: ({ leafUserId, fieldId, ...query }, { session }) => {
+  execute: ({ leafUserId, fieldId, ...query }, { session } = {}) => {
     const url = new URL(
       `weather/api/users/${leafUserId}/weather/historical/field/${fieldId}/daily`,
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url);
+    return _get(url, session?.leafToken || `Bearer ${ENV_TOKEN}`);
   }
 });
 
@@ -472,13 +493,13 @@ addTool({
     model:      z.string().optional(),
     units:      z.string().optional()
   }),
-  execute: ({ leafUserId, fieldId, ...query }, { session }) => {
+  execute: ({ leafUserId, fieldId, ...query }, { session } = {}) => {
     const url = new URL(
       `weather/api/users/${leafUserId}/weather/historical/field/${fieldId}/hourly`,
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url);
+    return _get(url, session?.leafToken || `Bearer ${ENV_TOKEN}`);
   }
 });
 
@@ -495,13 +516,13 @@ addTool({
     model:     z.string().optional(),
     units:     z.string().optional()
   }),
-  execute: ({ lat, lon, ...query }, { session }) => {
+  execute: ({ lat, lon, ...query }, { session } = {}) => {
     const url = new URL(
       `weather/api/weather/historical/daily/${lat},${lon}`,
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url);
+    return _get(url, session?.leafToken || `Bearer ${ENV_TOKEN}`);
   }
 });
 
@@ -516,13 +537,13 @@ addTool({
     model:     z.string().optional(),
     units:     z.string().optional()
   }),
-  execute: ({ lat, lon, ...query }, { session }) => {
+  execute: ({ lat, lon, ...query }, { session } = {}) => {
     const url = new URL(
       `weather/api/weather/historical/hourly/${lat},${lon}`,
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url);
+    return _get(url, session?.leafToken || `Bearer ${ENV_TOKEN}`);
   }
 });
 
