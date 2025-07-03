@@ -1,39 +1,63 @@
 #!/usr/bin/env node
 /**
- * Leaf MCP proxy — Node 18+ / fastmcp@3.8
+ * Leaf MCP proxy  —  Node 18+ / fastmcp ≥ 3.8
  *
- *   normal :  node leaf-mcp
- *   list    :  leaf-mcp --tools=list
+ *   Local (STDIO) :  LEAF_API_KEY=<key> node src/server.js
+ *   Remote (HTTP) :  MCP_HTTP=1         node src/server.js
  */
+
 import { FastMCP } from "fastmcp";
 import { z }       from "zod";
 import fs          from "node:fs";
 import path        from "node:path";
 
+/* ─────────── runtime flags ─────────── */
+const USE_HTTP = process.env.MCP_HTTP === "1";
+const PORT     = process.env.PORT     || 8080;
+
+/* ─────────── bearer-token handling ─── */
+let currentToken = (process.env.LEAF_API_KEY || "").trim();
+
+if (!USE_HTTP && !currentToken) {
+  throw new Error("LEAF_API_KEY env var is missing (required for STDIO mode)");
+}
+
+/* ─────────── constants ─────────── */
+const BASE_URL = new URL("https://api.withleaf.io/services/");   // keep trailing "
+
+/* ─────────── FastMCP instance ────── */
+const server = new FastMCP({ name: "Leaf API", version: "1.0.0" });
+
+/*  If HTTP mode is active, verify each request carries
+    `Authorization: Bearer <leaf-api-key>` and store it.                 */
+server.options.authenticate = async (req) => {
+  const hdr = req.headers.authorization || "";
+  if (!hdr.startsWith("Bearer ")) {
+    throw new Response("Missing Bearer token", { status: 401 });
+  }
+  currentToken = hdr;              // update for this request
+  return {};                       // no session data needed
+};
+
+/* ─────────── helper fetch wrappers ─ */
+const _get = async (url) => {
+  const res = await fetch(url, { headers: { Authorization: currentToken } });
+  const txt = await res.text();
+  try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
+};
+const _bodyReq = async (url, method, bodyObj) => {
+  const res = await fetch(url, {
+    method,
+    headers: { Authorization: currentToken, "Content-Type": "application/json" },
+    body: JSON.stringify(bodyObj ?? {}),
+  });
+  const txt = await res.text();
+  try { return JSON.stringify(JSON.parse(txt)); } catch { return txt; }
+};
+
 /* ---------- constants ---------- */
-const BASE_URL = new URL("https://api.withleaf.io/services/");   // keep trailing /
-const PORT        = process.env.PORT      ?? 8080;
-const USE_HTTP    = process.env.MCP_HTTP === "1";   // set only inside Docker/tunnel
-
-const token = (process.env.LEAF_API_KEY || "").trim();
-if (!token) throw new Error("LEAF_API_KEY env var is missing");
-const AUTH  = `Bearer ${token}`;
-
-/* ---------- FastMCP shell ---------- */
-const server    = new FastMCP({ name: "Leaf API", version: "1.0.0" });
 const catalogue = [];
 function addTool(t) { server.addTool(t); catalogue.push({ name: t.name, description: t.description }); }
-
-/* ---------- tiny helper ---------- */
-const _get = async (url, token) =>
-  (await fetch(url, { headers: { Authorization: `Bearer ${token}` } })).text();
-
-const _bodyReq = async (url, method, body, token) =>
-  (await fetch(url, {
-    method,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body ?? {})
-  })).text();
 
 /* =====  EMBEDDED DOCS  ===== */
 
@@ -82,7 +106,7 @@ addTool({
   description: "Create a field for a Leaf user.",
   parameters: z.object({ leafUserId: z.string(), body: z.any() }),
   execute: ({ leafUserId, body }, { session }) =>
-    _bodyReq(new URL(`fields/api/users/${leafUserId}/fields`, BASE_URL), "POST", body, session?.leafToken ?? token)
+    _bodyReq(new URL(`fields/api/users/${leafUserId}/fields`, BASE_URL), "POST", body)
 });
 
 addTool({
@@ -90,7 +114,7 @@ addTool({
   description: "Fetch a single field by ID.",
   parameters: z.object({ leafUserId: z.string(), fieldId: z.string() }),
   execute: ({ leafUserId, fieldId }, { session }) =>
-    _get(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}`, BASE_URL), session?.leafToken ?? token)
+    _get(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}`, BASE_URL))
 });
 
 addTool({
@@ -118,7 +142,7 @@ Pagination:
   execute: (args, { session }) => {
     const url = new URL("fields/api/fields", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session?.leafToken ?? token);
+    return _get(url);
   }
 });
 
@@ -127,7 +151,7 @@ addTool({
   description: "Return the active boundary of a field.",
   parameters: z.object({ leafUserId: z.string(), fieldId: z.string() }),
   execute: ({ leafUserId, fieldId }, { session }) =>
-    _get(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL), session?.leafToken ?? token)
+    _get(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL))
 });
 
 addTool({
@@ -135,7 +159,7 @@ addTool({
   description: "Replace the active boundary of a field.",
   parameters: z.object({ leafUserId: z.string(), fieldId: z.string(), body: z.any() }),
   execute: ({ leafUserId, fieldId, body }, { session }) =>
-    _bodyReq(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL),"PUT",body,session?.leafToken ?? token)
+    _bodyReq(new URL(`fields/api/users/${leafUserId}/fields/${fieldId}/boundary`, BASE_URL),"PUT",body)
 });
 
 /* =====  OPERATIONS  ===== */
@@ -176,7 +200,7 @@ Example: "startTime,desc"
   execute: (args, { session }) => {
     const url = new URL("operations/api/operations", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session?.leafToken ?? token);
+    return _get(url);
   }
 });
 
@@ -184,21 +208,21 @@ addTool({
   name: "getOperation",
   description: "Get a single operation by ID.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}`, BASE_URL), session?.leafToken ?? token)
+  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}`, BASE_URL))
 });
 
 addTool({
   name: "getOperationSummary",
   description: "Get GeoJSON summary for an operation.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}/summary`, BASE_URL), session?.leafToken ?? token)
+  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}/summary`, BASE_URL))
 });
 
 addTool({
   name: "getOperationUnits",
   description: "Return unit map for an operation.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}/units`, BASE_URL), session?.leafToken ?? token)
+  execute: ({ id }, { session }) => _get(new URL(`operations/api/operations/${id}/units`, BASE_URL))
 });
 
 /* =====  LEAF USERS  ===== */
@@ -227,7 +251,7 @@ Pagination:
   execute: (args, { session }) => {
     const url = new URL("usermanagement/api/users", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session?.leafToken ?? token);
+    return _get(url);
   }
 });
 
@@ -270,7 +294,7 @@ Example: "createdTime,desc"
   execute: (args, { session } = {}) => {
     const url = new URL("operations/api/files", BASE_URL);
     for (const [k, v] of Object.entries(args)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session?.leafToken ?? token);
+    return _get(url);
   }
 });
 
@@ -278,14 +302,14 @@ addTool({
   name: "getFile",
   description: "Return a machine file by ID.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/files/${id}`, BASE_URL), session?.leafToken ?? token)
+  execute: ({ id }, { session }) => _get(new URL(`operations/api/files/${id}`, BASE_URL))
 });
 
 addTool({
   name: "getFileSummary",
   description: "Return summary for a machine file by ID.",
   parameters: z.object({ id: z.string() }),
-  execute: ({ id }, { session }) => _get(new URL(`operations/api/files/${id}/summary`, BASE_URL), session?.leafToken ?? token)
+  execute: ({ id }, { session }) => _get(new URL(`operations/api/files/${id}/summary`, BASE_URL))
 });
 
 addTool({
@@ -321,7 +345,7 @@ addTool({
    */
   parameters: z.object({ id: z.string() }),
   execute: ({ id }, { session }) =>
-    _get(new URL(`operations/api/files/${id}/status`, BASE_URL), session?.leafToken ?? token)
+    _get(new URL(`operations/api/files/${id}/status`, BASE_URL))
 });
 
 /* =====  WEATHER  ===== */
@@ -345,7 +369,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session?.leafToken ?? token);
+    return _get(url);
   }
 });
 
@@ -366,7 +390,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session?.leafToken ?? token);
+    return _get(url);
   }
 });
 
@@ -389,7 +413,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session?.leafToken ?? token);
+    return _get(url);
   }
 });
 
@@ -410,7 +434,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session?.leafToken ?? token);
+    return _get(url);
   }
 });
 
@@ -433,7 +457,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session?.leafToken ?? token);
+    return _get(url);
   }
 });
 
@@ -454,7 +478,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session?.leafToken ?? token);
+    return _get(url);
   }
 });
 
@@ -477,7 +501,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session?.leafToken ?? token);
+    return _get(url);
   }
 });
 
@@ -498,7 +522,7 @@ addTool({
       BASE_URL
     );
     for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, v);
-    return _get(url, session?.leafToken ?? token);
+    return _get(url);
   }
 });
 
@@ -509,14 +533,6 @@ if (process.argv.includes("--tools=list")) {
 }
 
 /* ---------- stdio loop ---------- */
-server.options.authenticate = async (req) => {
-  const raw = req.headers.authorization;
-  if (!raw?.startsWith("Bearer ")) {
-    throw new Response(null, { status: 401, statusText: "Missing Bearer token" });
-  }
-  return { leafToken: raw.slice(7) };          // expose as session.leafToken
-};
-
 await server.start(
   USE_HTTP
     ? { transportType: "httpStream", httpStream: { port: PORT } }    // remote

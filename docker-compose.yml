@@ -1,0 +1,16 @@
+services:
+  mcp:
+    build: .
+    restart: unless-stopped
+    environment:
+      MCP_HTTP: "1"
+      PORT: "8080"
+
+  tunnel:
+    image: cloudflare/cloudflared:2024.6.0
+    restart: unless-stopped
+    depends_on:            # no health condition
+      - mcp
+    environment:
+      TUNNEL_TOKEN: "${TUNNEL_TOKEN}"
+    command: tunnel run --token ${TUNNEL_TOKEN}
