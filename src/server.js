@@ -28,16 +28,16 @@ const BASE_URL = new URL("https://api.withleaf.io/services/");   // keep trailin
 /* ─────────── FastMCP instance ────── */
 const server = new FastMCP({ name: "Leaf API", version: "1.0.0" });
 
-/*  If HTTP mode is active, verify each request carries
-    `Authorization: Bearer <leaf-api-key>` and store it.                 */
-server.options.authenticate = async (req) => {
-  const hdr = req.headers.authorization || "";
-  if (!hdr.startsWith("Bearer ")) {
-    throw new Response("Missing Bearer token", { status: 401 });
-  }
-  currentToken = hdr;              // update for this request
-  return {};                       // no session data needed
-};
+if (USE_HTTP) {
+  server.options.authenticate = async (req) => {
+    const hdr = req.headers.authorization || "";
+    if (!hdr.startsWith("Bearer ")) {
+      throw new Response("Missing Bearer token", { status: 401 });
+    }
+    currentToken = hdr;              // update for this request
+    return {};                       // no session data needed
+  };
+}
 
 /* ─────────── helper fetch wrappers ─ */
 const _get = async (url) => {
